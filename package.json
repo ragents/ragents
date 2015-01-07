@@ -1,0 +1,28 @@
+{
+    "name":               "ragents",
+    "version":            "0.1.0",
+    "description":        "agent messaging protocol over WebSocket",
+    "author":             "pmuellr",
+    "main":               "lib/ragents",
+    "scripts": {
+      "jbuild":           "jbuild",
+      "watch":            "jbuild watch"
+    },
+    "homepage":           "https://github.com/pmuellr/ragents",
+    "license":            "Apache-2.0",
+    "repository": {
+      "type":             "git",
+      "url" :             "https://github.com/ragents/ragents.git"
+    },
+    "dependencies": {
+      "underscore":     "1.7.x",
+      "websocket":      "1.0.x"
+    },
+    "devDependencies": {
+      "bower":          "1.3.x",
+      "browserify":     "6.3.x",
+      "cat-source-map": "0.1.x",
+      "jbuild":         "1.0.x",
+      "typescript":     "1.3.x"
+    }
+}
