@@ -19,8 +19,7 @@
       "websocket":      "1.0.x"
     },
     "devDependencies": {
-      "bower":          "1.3.x",
-      "browserify":     "6.3.x",
+      "browserify":     "8.1.x",
       "cat-source-map": "0.1.x",
       "jbuild":         "1.0.x",
       "typescript":     "1.3.x"

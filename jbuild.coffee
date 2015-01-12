@@ -1,13 +1,15 @@
 # Licensed under the Apache License. See footer for details.
 
+path = require "path"
+
 pkg = require("./package.json")
+
+preReqFile = "../ragents-test/tmp/pre-reqs-updated.txt"
 
 #-------------------------------------------------------------------------------
 tasks = defineTasks exports,
-  watch: "watch for source file changes, build, restart server"
+  watch: "watch for source file changes, build"
   build: "run a build"
-  serve: "run the server stand-alone"
-  bower: "get files from bower"
 
 WatchSpec = "*.ts lib lib/**/* www www/**/*"
 
@@ -17,8 +19,8 @@ mkdir "-p", "tmp"
 #-------------------------------------------------------------------------------
 tasks.build = ->
   tsc "--outDir tmp --module commonjs ragents-def.ts"
-  tasks.bower()
   build_browser_version()
+  "".to preReqFile
 
 #-------------------------------------------------------------------------------
 tasks.watch = ->
@@ -33,31 +35,26 @@ tasks.watch = ->
     process.exit 0
 
 #-------------------------------------------------------------------------------
-tasks.serve = ->
-  log "restarting server at #{new Date()}"
-
-  server.start "tmp/server.pid", "node", ["lib/ragentsd"]
-
-#-------------------------------------------------------------------------------
-tasks.bower = ->
-  copyBowerFiles "www/bower"
-
-#-------------------------------------------------------------------------------
 build_browser_version = ->
 
   oFile = "www/ragents-browser.js"
   tFile = "tmp/ragents-browser.js"
 
+  mkdir "-p", path.dirname oFile
+  mkdir "-p", path.dirname tFile
+
   opts = """
     --standalone ragents
     --outfile    #{tFile}
-    --entry      lib/ragents
-    --exclude    "node_modules/websocket/**/*"
+    --entry      lib/ragents.js
     --debug
   """
 
+#    --exclude    "node_modules/websocket/**/*"
+
   opts = opts.trim().split(/\s+/).join(" ")
 
+  log "running: browserify #{opts}"
   browserify opts
 
   cat_source_map "--fixFileNames #{tFile} #{oFile}"
@@ -65,35 +62,8 @@ build_browser_version = ->
   log "generated #{oFile}"
 
 #-------------------------------------------------------------------------------
-copyBowerFiles = (dir) ->
-
-  bowerConfig = require "./bower-config"
-
-  cleanDir dir
-
-  for name, {version, files} of bowerConfig
-    unless test "-d", "bower_components/#{name}"
-      log "installing from bower: #{name} (#{version})"
-      exec "node node_modules/.bin/bower install #{name}##{version}"
-      log ""
-
-  for name, {version, files} of bowerConfig
-    for src, dst of files
-      src = "bower_components/#{name}/#{src}"
-
-      if dst is "."
-        dst = "#{dir}/#{name}"
-      else
-        dst = "#{dir}/#{name}/#{dst}"
-
-      mkdir "-p", dst
-
-      cp "-R", src, dst
-
-#-------------------------------------------------------------------------------
 watchIter = ->
   tasks.build()
-  tasks.serve()
 
 #-------------------------------------------------------------------------------
 cleanDir = (dir) ->

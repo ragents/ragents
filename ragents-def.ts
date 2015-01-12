@@ -12,58 +12,46 @@ export function createSession(
 
 //------------------------------------------------------------------------------
 interface CreateSessionOpts {
-  wsURL: string
-  key:   string
+  url: string
+  key: string
 }
 
 //------------------------------------------------------------------------------
 interface Session extends events.EventEmitter {
   close(code:number, reason: string): void
 
-  connectAgent(
+  createAgent(
     agentInfo: AgentInfo,
     cb:        (err: Error, agent: Agent) => void
   ): void
 
-  getAgents(
+  getRemoteAgents(
     cb: (err: Error, ragents: RAgent[]) => void
   ): void
 }
 
+// events
 interface Session_event_close { (status: CloseStatus): void }
 interface Session_event_error { (err: Error): void }
-interface Session_event_agentConnected { (ragent: RAgent): void }
-interface Session_event_agentDisconnected { (ragent: RAgent): void }
+interface Session_event_ragentConnected { (ragent: Ragent): void }
+interface Session_event_ragentDisconnected { (ragent: Ragent): void }
+
+// system level messages published
+// - agentConnected
+// - agentDisonnected
 
 //------------------------------------------------------------------------------
 interface AgentInfo {
   id:       string
   name:     string
   title:    string
-}
-
-//------------------------------------------------------------------------------
-interface RAgent {
-  info: AgentInfo
-
-  subscribe(
-    name: string,
-    cb: (message: AMessage) => void
-  ): void
-
-  unsubscribe(
-    name: string
-  ): void
-
-  send(
-    name:    string,
-    message: Message,
-    cb:      (err: Error, response: AMessage) => void
-  )
+  session:  Session
 }
 
 //------------------------------------------------------------------------------
 interface Agent {
+  info: AgentInfo
+
   publish(
     name:    string,
     message: Message
@@ -73,6 +61,26 @@ interface Agent {
     name: string,
     cb: (message: AMessage, reply: Reply) => void
   )
+}
+
+//------------------------------------------------------------------------------
+interface RAgent {
+  info: AgentInfo
+
+  send(
+    name:    string,
+    message: Message,
+    cb:      (err: Error, response: AMessage) => void
+  )
+
+  subscribe(
+    name: string,
+    cb: (message: AMessage) => void
+  ): void
+
+  unsubscribe(
+    name: string
+  ): void
 }
 
 //------------------------------------------------------------------------------
