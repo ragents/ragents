@@ -8,7 +8,7 @@
 export function createSession(
   opts:  CreateSessionOpts,
   cb:    (err: Error, session: Session) => void
-): void {}
+) {}
 
 //------------------------------------------------------------------------------
 interface CreateSessionOpts {
@@ -18,23 +18,25 @@ interface CreateSessionOpts {
 
 //------------------------------------------------------------------------------
 interface Session extends events.EventEmitter {
-  close(code:number, reason: string): void
+  close(code: number, reason: string)
 
   createAgent(
     agentInfo: AgentInfo,
     cb:        (err: Error, agent: Agent) => void
-  ): void
+  )
+
+  getAgents(): Agent[]
 
   getRemoteAgents(
     cb: (err: Error, ragents: RAgent[]) => void
-  ): void
+  )
 }
 
 // events
-interface Session_event_close { (status: CloseStatus): void }
-interface Session_event_error { (err: Error): void }
-interface Session_event_ragentConnected { (ragent: Ragent): void }
-interface Session_event_ragentDisconnected { (ragent: Ragent): void }
+interface Session_event_close              { (code: number, reason: string) }
+interface Session_event_error              { (err: Error) }
+interface Session_event_ragentCreated      { (ragent: RAgent) }
+interface Session_event_ragentDestroyed    { (ragent: RAgent) }
 
 // system level messages published
 // - agentConnected
@@ -42,23 +44,22 @@ interface Session_event_ragentDisconnected { (ragent: Ragent): void }
 
 //------------------------------------------------------------------------------
 interface AgentInfo {
-  id:       string
-  name:     string
-  title:    string
-  session:  Session
+  id:    string
+  name:  string
+  title: string
 }
 
 //------------------------------------------------------------------------------
 interface Agent {
   info: AgentInfo
 
+  destroy()
+
   publish(
-    name:    string,
     message: Message
-  ): void
+  )
 
   receive(
-    name: string,
     cb: (message: AMessage, reply: Reply) => void
   )
 }
@@ -68,19 +69,23 @@ interface RAgent {
   info: AgentInfo
 
   send(
-    name:    string,
     message: Message,
     cb:      (err: Error, response: AMessage) => void
   )
 
   subscribe(
-    name: string,
-    cb: (message: AMessage) => void
-  ): void
+    cb: (message: AMessage, subID: string) => void
+  )
 
-  unsubscribe(
-    name: string
-  ): void
+  unsubscribe(subID: string)
+
+  subscriptions(): Subscription[]
+}
+
+//------------------------------------------------------------------------------
+interface Subscription {
+  ragent: RAgent
+  subID:  string
 }
 
 //------------------------------------------------------------------------------
@@ -91,8 +96,8 @@ interface CloseStatus {
 
 //------------------------------------------------------------------------------
 interface Message {
-  name:  string
-  body:  any
+  name: string
+  body: any
 }
 
 //------------------------------------------------------------------------------
@@ -102,7 +107,7 @@ interface AMessage extends Message {
 
 //------------------------------------------------------------------------------
 interface Reply {
-  reply(message: Message): void
+  reply(message: Message)
 }
 
 //------------------------------------------------------------------------------

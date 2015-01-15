@@ -27,10 +27,6 @@ function createSession(opts, cb) {
   var url = opts.url
   var key = opts.key
 
-  if (url.match(/^https?:/)) {
-    url = url.replace(/^http/, "ws")
-  }
-
   opts = {
     url: url,
     key: key
@@ -41,18 +37,15 @@ function createSession(opts, cb) {
 
 //------------------------------------------------------------------------------
 function checkOpts(opts, cb) {
-  if (opts == null) throw Error("opts is null")
+  var prefix = "ragents.createSession(): "
 
-  if (opts.url == null) throw Error("opts.url is null")
-  if (opts.key == null) throw Error("opts.key is null")
+  if (opts == null) throw Error(prefix + "opts is null")
 
-  if (null == cb)        throw Error("callback is null")
-  if (!_.isFunction(cb)) throw Error("callback is not a function")
-}
+  if (opts.url == null) throw Error(prefix + "opts.url is null")
+  if (opts.key == null) throw Error(prefix + "opts.key is null")
 
-//------------------------------------------------------------------------------
-function isBrowser() {
-  return typeof WebSocket != "undefined"
+  if (null == cb)        throw Error(prefix + "callback is null")
+  if (!_.isFunction(cb)) throw Error(prefix + "callback is not a function")
 }
 
 //------------------------------------------------------------------------------
@@ -65,6 +58,11 @@ function getWS() {
   catch (e) {
     throw Error("unable to load package `" + Package_websocket + "`: " + e)
   }
+}
+
+//------------------------------------------------------------------------------
+function isBrowser() {
+  return typeof WebSocket != "undefined"
 }
 
 //------------------------------------------------------------------------------
@@ -96,111 +94,30 @@ var WSProtocol = "ragents-protocol"
 
 //------------------------------------------------------------------------------
 function createSession(WebSocket, opts, cb) {
-  var session = new Session(WebSocket, opts, onCreated)
+  cb = utils.callOnce(cb)
 
-  //-----------------------------------
-  function onCreated(err) {
-    if (err) return cb(err)
-
-    cb(null, session)
-  }
+  new Session(WebSocket, opts, cb)
 }
 
 //------------------------------------------------------------------------------
 function Session(WebSocket, opts, cb) {
-  this._agents    = {}
-  this._connected = false
-  this._cbSent    = false
+  events.EventEmitter.call(this)
 
-  var ws = this._ws = WebSocket(opts.url, [WSProtocol])
-  ws.addEventListener("open",    onOpen)
-  ws.addEventListener("message", onMessage)
-  ws.addEventListener("close",   onClose)
-  ws.addEventListener("error",   onError)
+  this._agents    = {}
+  this._ragents   = {}
+  this._cbSent    = false
+  this._connected = false
+  this._nextReqID = utils.sequencer("reqID")
+  this._reqCBs    = {}
+
+  this._ws = WebSocket(opts.url, [WSProtocol])
 
   var self = this
 
-  //-----------------------------------
-  function onOpen(event) {
-    var message = {
-      type:      "request",
-      name:      "sys/connect",
-      requestID: "0",
-      data: {
-        key:     opts.key
-      }
-    }
-
-    message = utils.JL(message)
-    ws.send(message)
-  }
-
-  //-----------------------------------
-  function onMessage(event) {
-    // event.data = DOMString | Blob | ArrayBuffer
-
-    var message = JSON.parse(event.data)
-
-    if (!self._connected) return onConnectMessage(message)
-  }
-
-  //-----------------------------------
-  function onConnectMessage(message) {
-    if (message.type != "response") return
-    if (message.name != "sys/connect") return
-    if (message.requestID != "0") return
-
-    var data = message.data || {}
-    if (!data.id) return
-
-    self._id = data.id
-
-    self._connected = true
-    self._cbSent    = true
-    cb(null, self)
-  }
-
-  //-----------------------------------
-  function onClose(event) {
-    // event.code   = unsigned long
-    // event.reason = DOMString
-
-    var data
-
-    if (!self._connected) {
-      data = new Error("close")
-    }
-    else {
-      data = {}
-    }
-
-    data.code   = event.code
-    data.reason = event.reason
-
-    if (!self._connected) {
-      if (self._cbSent) return
-
-      self._cbSent = true
-      return cb(data)
-    }
-
-
-    self.emit("close", data)
-  }
-
-  //-----------------------------------
-  function onError(event) {
-    var err = new Error("error")
-
-    if (!self._connected) {
-      if (self._cbSent) return
-
-      self._cbSent = true
-      return cb(err)
-    }
-
-    self.emit("error", err)
-  }
+  this._ws.addEventListener("open",    function(e) {self.onOpen(e, cb)} )
+  this._ws.addEventListener("message", function(e) {self.onMessage(e)} )
+  this._ws.addEventListener("close",   function(e) {self.onClose(e, cb)} )
+  this._ws.addEventListener("error",   function(e) {self.onError(e, cb)} )
 }
 
 util.inherits(Session, events.EventEmitter)
@@ -208,20 +125,223 @@ util.inherits(Session, events.EventEmitter)
 Session.prototype.close           = Session_close
 Session.prototype.createAgent     = Session_createAgent
 Session.prototype.getRemoteAgents = Session_getRemoteAgents
+Session.prototype._sendmessage    = Session_sendMessage
+Session.prototype._onOpen         = Session_onOpen
+Session.prototype._onMessage      = Session_onMessage
+Session.prototype._onClose        = Session_onClose
+Session.prototype._onError        = Session_onError
+Session.prototype._onResponse     = Session_onResponse
 
 //------------------------------------------------------------------------------
 function Session_close(code, reason) {
+  if (!this._ws) return
 
+  this._ws.close(code, reason)
+  delete this._ws
 }
 
 //------------------------------------------------------------------------------
 function Session_createAgent(agentInfo, cb) {
+  var reqID   = this._nextReqID()
+  var message = {
+    type:      "request",
+    name:      "createAgent",
+    to:        "sys",
+    requestID: reqID,
+    data:      {
+      agentInfo: agentInfo
+    }
+  }
 
+  var self = this
+
+  self._sendMessage(message)
+  self._onResponse(reqID, onCreateAgent)
+
+  //-----------------------------------
+  function onCreateAgent(message) {
+    var agentInfo = message.data.agentInfo
+    var agent = agent.createAgent(agentInfo)
+
+    self._agents[agentInfo.agentID] = agent
+
+    cb(null, agent)
+  }
 }
 
 //------------------------------------------------------------------------------
 function Session_getRemoteAgents(cb) {
+  var reqID   = this._nextReqID()
+  var message = {
+    type:      "request",
+    name:      "getAgents",
+    to:        "sys",
+    requestID: reqID
+  }
 
+  var self = this
+
+  self._sendMessage(message)
+  self._onResponse(reqID, onGetRemoteAgents)
+
+  //-----------------------------------
+  function onGetRemoteAgents(message) {
+    var agentInfos = message.data.agentInfos
+
+    var agents = agentInfos.map(function(agentInfo) {
+      var agent = self._agents[agentInfo.agentID]
+      if (agent) return agent
+
+      agent = agent.createRAgent(agentInfo)
+      return agent
+    })
+
+    cb(null, agents)
+  }
+}
+
+//------------------------------------------------------------------------------
+function Session_onOpen(event) {
+  var reqID   = this._nextReqID()
+  var message = {
+    type:      "request",
+    name:      "connect",
+    to:        "sys",
+    requestID: reqID
+  }
+
+  this._sendMessage(message)
+  this._onResponse(reqID, onConnect)
+
+  //-----------------------------------
+  function onConnect(message) {
+    if (message.error) {
+      var err = new Error("error connecting")
+      err.detail = message.error
+
+      cb(err)
+      return
+    }
+
+    this._connected = true
+    cb(null, this)
+  }
+}
+
+//------------------------------------------------------------------------------
+function Session_onMessage(event) {
+  var message = JSON.parse(event.data)
+
+  if (!this._connected) {
+    if (message.type != "response") return
+    if (message.name != "connect") return
+    if (message.from != "sys") return
+  }
+
+  if      (message.type == "request")  onMessageRequest(this, message)
+  else if (message.type == "response") onMessageResponse(this, message)
+  else if (message.type == "event")    onMessageEvent(this, message)
+}
+
+//------------------------------------------------------------------------------
+function onMessageRequest(session, message) {
+}
+
+//------------------------------------------------------------------------------
+function onMessageResponse(session, message) {
+  var response = {}
+
+  var reqID = message.requestID
+  var cb    = this._reqCBs[reqID]
+
+  if (!cb) return
+
+  delete this._reqCBs[reqID]
+
+  if (message.error) {
+    var err = new Error("request error")
+    err.detail = message.error
+    return cb(err)
+  }
+
+  response.name = message.name
+  response.body = message.body
+
+  if (message.from != "sys") {
+    response.ragent = getRAgent(session, message.from)
+  }
+  
+  cb(null, response)
+}
+
+//------------------------------------------------------------------------------
+function onMessageEvent(session, message) {
+}
+
+//------------------------------------------------------------------------------
+function onConnectMessage(session, message) {
+  if (message.type != "response") return
+  if (message.name != "sys/connect") return
+  if (message.requestID != "0") return
+
+  var data = message.data || {}
+  if (!data.id) return
+
+  self._id = data.id
+
+  self._connected = true
+  self._cbSent    = true
+  cb(null, self)
+}
+
+//------------------------------------------------------------------------------
+function Session_onClose(event, cb) {
+  // event.code   = unsigned long
+  // event.reason = DOMString
+
+  var data = {
+    code:   event.code,
+    reason: event.reason
+  }
+
+  if (!self._connected) {
+    err = new Error("WebSocket closed")
+    err.detail = data
+
+    cb(err)
+  }
+
+  self.emit("close", data)
+}
+
+//------------------------------------------------------------------------------
+function Session_onError(event, cb) {
+  var err = new Error("WebSocket error")
+
+  if (!self._connected) {
+    cb(err)
+  }
+
+  self.emit("error", err)
+}
+
+//------------------------------------------------------------------------------
+function Session_sendMessage(message) {
+  message = validateMessage(message)
+
+  if (!this._ws) return
+
+  this._ws.send(message)
+}
+
+//------------------------------------------------------------------------------
+function Session_onResponse(reqID, cb) {
+  this._reqCBs[reqID] = cb
+}
+
+//------------------------------------------------------------------------------
+function validateMessage(message) {
+  return JSON.stringify(message, null, 2)
 }
 
 //------------------------------------------------------------------------------
@@ -276,6 +396,21 @@ function sequencer(prefix) {
     if (curr >= max) curr = 0
 
     return prefix + result
+  }
+}
+
+//------------------------------------------------------------------------------
+function callOnce(fn) {
+  var called = false
+
+  return calledOnceShim
+
+  //-----------------------------------
+  function calledOnceShim() {
+    if (called) return
+    called = true
+
+    fn.apply(this, arguments)
   }
 }
 
@@ -2701,31 +2836,31 @@ function hasOwnProperty(obj, prop) {
 
 },{}],10:[function(require,module,exports){
 module.exports={
-    "name":               "ragents",
-    "version":            "0.1.0",
-    "description":        "agent messaging protocol over WebSocket",
-    "author":             "pmuellr",
-    "main":               "lib/ragents",
-    "scripts": {
-      "jbuild":           "jbuild",
-      "watch":            "jbuild watch"
-    },
-    "homepage":           "https://github.com/pmuellr/ragents",
-    "license":            "Apache-2.0",
-    "repository": {
-      "type":             "git",
-      "url" :             "https://github.com/ragents/ragents.git"
-    },
-    "dependencies": {
-      "underscore":     "1.7.x",
-      "websocket":      "1.0.x"
-    },
-    "devDependencies": {
-      "browserify":     "8.1.x",
-      "cat-source-map": "0.1.x",
-      "jbuild":         "1.0.x",
-      "typescript":     "1.3.x"
-    }
+  "name":               "ragents",
+  "version":            "0.1.0",
+  "description":        "agent messaging protocol over WebSocket",
+  "author":             "pmuellr",
+  "main":               "lib/ragents",
+  "scripts": {
+    "jbuild":           "jbuild",
+    "watch":            "jbuild watch"
+  },
+  "homepage":           "https://github.com/ragents/ragents",
+  "license":            "Apache-2.0",
+  "repository": {
+    "type":             "git",
+    "url" :             "https://github.com/ragents/ragents.git"
+  },
+  "dependencies": {
+    "underscore":       "1.7.x",
+    "websocket":        "1.0.x"
+  },
+  "devDependencies": {
+    "browserify":       "8.1.x",
+    "cat-source-map":   "0.1.x",
+    "jbuild":           "1.0.x",
+    "typescript":       "1.3.x"
+  }
 }
 
 },{}]},{},[1])(1)

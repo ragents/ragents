@@ -1,59 +1,105 @@
 ragents protocol
 ================================================================================
 
-OUT OF DATE
-
-OUT OF DATE
-
-OUT OF DATE
-
-OUT OF DATE
-
-OUT OF DATE
-
 Description of the message packets flowing over the WebSockets used by ragents.
 
-There are three types of programs communicating when using ragents:
-
-* targets
-* clients
-* servers
-
-A *target* is the program which is being interacted with; eg, the program
-you are debugging.
-
-A *client* is a program running that a user interacts with, to control the
-*target*; eg, the debugger user interface.  It acts as an HTTP client to the
-*server*.
-
-A *server* is an HTTP server that *targets* and *clients* connect to, in order
-to interact with each other. It acts as an HTTP server for *targets* and
-*clients*.
-
+The ragents protocol allows peer-to-peer communication between programming
+components via pub/sub events, and request/response pairs.  
 
 general packet structure
 ================================================================================
 
 All messages are serialized JSON objects.
 
-    packet:    "request", "response", or "event"`
-    type:      agent-specific identifier
-    requestID: client- or agent-provided unique identifier for requests
+    type:      "request", "response", or "event"
+    name:      agent-specific identifier
+    from:      the id of the agent that is to be sent a message
+    to:        the id of the agent that is to be sent a message
+               (not used in events)
+    requestID: agent-provided unique identifier for requests
+               (not used in events)
     data:      JSON-able data specific to the request, response, or event
     error:     error message on a response, when an error occurred processing
                the request
 
-Every `request` packet must have a unique (per agent/client) `requestId`,
+Every `request` packet must have a unique (per agent) `requestId`,
 which will be resent with the associated `response` packet sent back.  Every
-`request` packet sent will have exactly one `response` packet received.
+`request` packet sent will have exactly one `response` packet sent in return.
 
-`agentID` and `clientID` are values provided by the ragents server when the
-target agent and clients send packets of type `connect`.
+Since the ragents server sends events and can handle some requests, it handles
+these messages with the same structure.  The server id, used in the `from` and
+`to` properties, is always `"sys"`.
+
+If the `error` property is set, the `data` property will be null, and vice
+versa.  Some messages have no `data` property and also no `error` property,
+and are considered non-error messages.
+
+When publishing an event, the publisher should create an event message, set
+the `from` property, and leave the `to` property undefined.  When subscribers
+receive an event message, the `to` property will be set to their agentID.
+
+Example:
+
+event published
+
+    type:      "event"
+    name:      "foo"
+    from:      <agentID of publisher>
+    data:      <any>
+
+event received from subscriber
+
+    type:      "event"
+    name:      "foo"
+    from:      <agentID of publisher>
+    to:        <agentID of subscriber>
+    data:      <any>
+
+When sending a request, the requester should set the `to` and `from` properties
+to the appropriate agentIDs.  The receiver of the request will have the properties
+set to the same values, and should flip the values when sending the response.
+The receiver of the response will also see the same values as those sent by
+the sender of the response.
+
+Example:
+
+request sent by requester
+
+    type:      "request"
+    name:      "foo"
+    from:      <agentID of requester>
+    to:        <agentID of requestee>
+    requestID: <requestID>
+    data:      <any>
+
+request received by requestee
+
+    same as above
+
+response sent by requestee
+
+    type:      "response"
+    name:      "foo"
+    from:      <agentID of requestee>
+    to:        <agentID of requester>
+    requestID: <requestID>
+    data:      <any>
+
+response received by requester
+
+    same as above
 
 
-
-from target to server
+messages provided by the server
 ================================================================================
+
+The server implements it's own events and request/reponse messages.  The
+agent id of the server is `"sys"`, and should be used as the value of the `to`
+property when sending requests.  The `from` property on responses and events
+from the server will have the value `"sys"`.
+
+These messages are not sent/received in the context of an agent, so the
+relevant `to` and `from` properties will be absent.
 
 
 request `connect`
@@ -65,261 +111,153 @@ be successful.
 
 request
 
-    packet:    "request"
-    type:      "connect"
+    type:      "request"
+    name:      "connect"
+    to:        "sys"
     requestID: <requestID>
     data:
       key:     <api key>
 
 response
 
-    packet:    "response"
-    type:      "connect"
+    type:      "response"
+    name:      "connect"
+    from:      "sys"
     requestID: <requestID>
-    error:                      // only on error responses
-    data:
 
 
-
-request `connect`
+request `createAgent`
 --------------------------------------------------------------------------------
-
-The agent sends this when a connection to a target is made.  A `targetID`
-is returned, to be used with future messages.
 
 request
 
-    packet:    "request"
-    type:      "target-connect"
+    type:      "request"
+    name:      "createAgent"
+    to:        "sys"
+    requestID: <requestID>
+    data:      AgentInfo object
+
+response
+
+    type:      "response"
+    name:      "createAgent"
+    from:      "sys"
+    requestID: <requestID>
+    data:      AgentInfo object
+
+
+request `destroyAgent`
+--------------------------------------------------------------------------------
+
+request
+
+    type:      "request"
+    name:      "destroyAgent"
+    to:        "sys"
+    requestID: <requestID>
+    data:
+      agentID: <agentID>
+
+response
+
+    type:      "response"
+    name:      "destroyAgent"
+    from:      "sys"
+    requestID: <requestID>
+    data:
+      agentID: <agentID>
+
+
+request `subscribe`
+--------------------------------------------------------------------------------
+
+request
+
+    type:      "request"
+    name:      "subscribe"
+    to:        "sys"
+    requestID: <requestID>
+    data:
+      agentID: <agentID of agent publishing events>
+
+response
+
+    type:      "response"
+    name:      "subscribe"
+    from:      "sys"
+    requestID: <requestID>
+    data:
+      agentID: <agentID of agent publishing events>
+      subID:   <subID>
+
+
+request `unsubscribe`
+--------------------------------------------------------------------------------
+
+request
+
+    type:      "request"
+    name:      "unsubscribe"
+    to:        "sys"
+    requestID: <requestID>
+    data:
+      subID:   <subID>
+
+response
+
+    type:      "response"
+    name:      "unsubscribe"
+    from:      "sys"
+    requestID: <requestID>
+    data:
+      agentID: <agentID of agent publishing events>
+      subID:   <subID>
+
+
+request `getAgents`
+--------------------------------------------------------------------------------
+
+request
+
+    type:      "request"
+    name:      "getAgents"
+    to:        "sys"
     requestID: <requestID>
     data:
 
 response
 
-    packet:    "response"
-    type:      "target-connect"
+    type:      "response"
+    name:      "getAgents"
+    from:      "sys"
     requestID: <requestID>
     data:
-      id:      targetID
-    error:                      // only on error responses
+      agents:  <array of AgentInfo>
 
 
-event `target-event`
+event `agentCreated`
 --------------------------------------------------------------------------------
 
-The agent sends this event when a target sends an event for a client.
+The server sends this event when an agent connects to the session.
 
-    packet:    "event"
-    type:      "target-event"
+event
+
+    type:      "event"
+    name:      "agentCreated"
+    from:      "sys"
     data:
-      id:      targetID
-      event:   <target-specific JSON-able object>
+      agent:   <AgentInfo>
 
 
-
-from server to target
-================================================================================
-
-request `target-request`
+event `agentDestroyed`
 --------------------------------------------------------------------------------
 
-The server sends this request to have a request sent to a
-target.
+The server sends this event when an agent connects to the session.
 
-request
+event
 
-    packet:    "request"
-    type:      "target-request"
-    requestID: <requestID>
+    type:      "event"
+    name:      "agentDestroyed"
+    from:      "sys"
     data:
-      id:      targetID
-      request: <JSONable object>
-
-response
-
-    packet:    "response"
-    type:      "target-request"
-    requestID: <requestID>
-    data:
-      response: <JSONable object>
-    error:                      // only on error responses
-
-
-event `client-attached`
---------------------------------------------------------------------------------
-
-The server sends this event when a client attaches to a target, where previously
-no clients had been attached.  When a client attaches to a target which
-already has at least one client attached, this event is not sent.
-
-    packet:    "event"
-    type:      "client-attached"
-    data:
-      id:      targetID
-
-
-
-event `client-detached`
---------------------------------------------------------------------------------
-
-The server sends this event when the last client detaches from a target.
-
-    packet:    "event"
-    type:      "client-detached"
-    data:
-      id:      targetID
-
-
-
-from client to server
-================================================================================
-
-
-request `client-connect`
---------------------------------------------------------------------------------
-
-The client sends this as it's first message, as a sort of authenticated login,
-using the `<api key>`.  If an error is returned, no further messages will
-be successful.
-
-request
-
-    packet:    "request"
-    type:      "client-connect"
-    requestID: <requestID>
-    data:
-      key:     <api key>
-
-response
-
-    packet:    "response"
-    type:      "client-connect"
-    requestID: <requestID>
-    data:
-    error:                      // only on error responses
-
-
-request `target-list`
---------------------------------------------------------------------------------
-
-The client sends this request to obtain the list of available targets that can
-be attached to.
-
-request
-
-    packet:    "request"
-    type:      "target-list"
-    requestID: <requestID>
-
-response
-
-    packet:    "response"
-    type:      "target-list"
-    requestID: <requestID>
-    data:      [ array of <targetId>]
-    error:                      // only on error responses
-
-
-request `target-attach`
---------------------------------------------------------------------------------
-
-The client sends this request to attach to a target.
-
-request
-
-    packet:    "request"
-    type:      "target-attach"
-    requestID: <requestID>
-    data:
-      id:      targetID
-
-response
-
-    packet:    "response"
-    type:      "target-attach"
-    requestID: <requestID>
-    error:                      // only on error responses
-
-
-request `target-detach`
---------------------------------------------------------------------------------
-
-The client sends this request to detach from a target.
-
-request
-
-    packet:    "request"
-    type:      "target-detach"
-    requestID: <requestID>
-    data:
-      id:      targetID
-
-response
-
-    packet:    "response"
-    type:      "target-detach"
-    requestID: <requestID>
-    error:                      // only on error responses
-
-
-request `target-request`
---------------------------------------------------------------------------------
-
-The client sends this request to have a request sent to a
-target.
-
-request
-
-    packet:    "request"
-    type:      "target-request"
-    requestID: <requestID>
-    data:
-      id:      targetID
-      request: <JSONable object>
-
-response
-
-    packet:    "response"
-    type:      "target-request"
-    requestID: <requestID>
-    data:
-      response: <JSONable object>
-    error:                      // only on error responses
-
-
-
-from server to client
-================================================================================
-
-The server sends this event when a new target connects.
-
-event `target-connected`
---------------------------------------------------------------------------------
-
-    packet:    "event"
-    type:      "target-connected"
-    data:
-      id:      targetID
-
-
-event `target-disconnected`
---------------------------------------------------------------------------------
-
-The server sends this event when a target disconnects.
-
-    packet:    "event"
-    type:      "target-disconnected"
-    data:
-      id:      targetID
-
-
-event `target-event`
---------------------------------------------------------------------------------
-
-The server sends this event when a target sends an event.
-
-    packet:    "event"
-    type:      "target-event"
-    data:
-      id:      targetID
-      event:   <JSONable object>
+      agent:   <AgentInfo>
