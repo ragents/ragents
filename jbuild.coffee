@@ -18,7 +18,7 @@ mkdir "-p", "tmp"
 
 #-------------------------------------------------------------------------------
 tasks.build = ->
-  tsc "--outDir tmp --module commonjs ragents-def.ts"
+  syntaxCheckTypeScript "ragents-def.ts"
   build_browser_version()
   "".to preReqFile
 
@@ -35,31 +35,35 @@ tasks.watch = ->
     process.exit 0
 
 #-------------------------------------------------------------------------------
+syntaxCheckTypeScript = (file) ->
+  log "syntax checking: #{file}"
+  tsc "--outDir tmp --module commonjs #{file}"
+
+#-------------------------------------------------------------------------------
 build_browser_version = ->
+  oBase  = "ragents-browser.js"
 
-  oFile = "www/ragents-browser.js"
-  tFile = "tmp/ragents-browser.js"
+  mkdir "-p", "www"
 
-  mkdir "-p", path.dirname oFile
-  mkdir "-p", path.dirname tFile
-
+  # run browserify
   opts = """
+    --outfile    tmp/#{oBase}
     --standalone ragents
-    --outfile    #{tFile}
     --entry      lib/ragents.js
+    --plugin     [ minifyify --map #{oBase}.map.json --output tmp/#{oBase}.map.json ]
     --debug
   """
 
-#    --exclude    "node_modules/websocket/**/*"
-
   opts = opts.trim().split(/\s+/).join(" ")
 
-  log "running: browserify #{opts}"
+  log "running browserify"
   browserify opts
 
-  cat_source_map "--fixFileNames #{tFile} #{oFile}"
+  # run cat-source-map
+  log "running cat-source-map"
+  cat_source_map "--fixFileNames tmp/#{oBase} www/#{oBase}"
 
-  log "generated #{oFile}"
+  log "browser file(s) generated at: www/#{oBase}"
 
 #-------------------------------------------------------------------------------
 watchIter = ->
