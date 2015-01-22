@@ -11,7 +11,7 @@ tasks = defineTasks exports,
   watch: "watch for source file changes, build"
   build: "run a build"
 
-WatchSpec = "*.ts lib lib/**/* www www/**/*"
+WatchSpec = "*.ts lib lib/**/* lib/channels lib/channels/**/* www www/**/*"
 
 #-------------------------------------------------------------------------------
 mkdir "-p", "tmp"
@@ -19,6 +19,11 @@ mkdir "-p", "tmp"
 #-------------------------------------------------------------------------------
 tasks.build = ->
   syntaxCheckTypeScript "ragents-def.ts"
+  syntaxCheckTypeScript "lib/channels/channel-def.ts"
+
+  log "linting ..."
+  jshint "lib/*.js lib/channels/*.js"
+
   build_browser_version()
   "".to preReqFile
 
@@ -36,7 +41,7 @@ tasks.watch = ->
 
 #-------------------------------------------------------------------------------
 syntaxCheckTypeScript = (file) ->
-  log "syntax checking: #{file}"
+  log "syntax checking: #{file} ..."
   tsc "--outDir tmp --module commonjs #{file}"
 
 #-------------------------------------------------------------------------------
@@ -56,11 +61,11 @@ build_browser_version = ->
 
   opts = opts.trim().split(/\s+/).join(" ")
 
-  log "running browserify"
+  log "running browserify ..."
   browserify opts
 
   # run cat-source-map
-  log "running cat-source-map"
+  log "running cat-source-map ..."
   cat_source_map "--fixFileNames tmp/#{oBase} www/#{oBase}"
 
   log "browser file(s) generated at: www/#{oBase}"

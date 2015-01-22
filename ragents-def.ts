@@ -18,14 +18,12 @@ interface CreateSessionOpts {
 
 //------------------------------------------------------------------------------
 interface Session extends events.EventEmitter {
-  close(code: number, reason: string)
+  close()
 
   createAgent(
     agentInfo: AgentInfo,
     cb:        (err: Error, agent: Agent) => void
   )
-
-  getAgents(): Agent[]
 
   getRemoteAgents(
     cb: (err: Error, ragents: RAgent[]) => void
@@ -33,14 +31,9 @@ interface Session extends events.EventEmitter {
 }
 
 // events
-interface Session_event_close              { (code: number, reason: string) }
-interface Session_event_error              { (err: Error) }
+interface Session_event_close              { () }
 interface Session_event_ragentCreated      { (ragent: RAgent) }
 interface Session_event_ragentDestroyed    { (ragent: RAgent) }
-
-// system level messages published
-// - agentConnected
-// - agentDisonnected
 
 //------------------------------------------------------------------------------
 interface AgentInfo {
@@ -56,11 +49,21 @@ interface Agent {
   destroy()
 
   publish(
-    message: Message
+    name:    string,
+    message: any
   )
 
   receive(
-    cb: (message: AMessage, reply: Reply) => void
+    name: string,
+    cb:   (message: any, reply: Reply) => void
+  )
+}
+
+//------------------------------------------------------------------------------
+interface Reply {
+  reply(
+    err:     Error,
+    message: any
   )
 }
 
@@ -69,45 +72,17 @@ interface RAgent {
   info: AgentInfo
 
   send(
-    message: Message,
-    cb:      (err: Error, response: AMessage) => void
+    name:    string,
+    message: any,
+    cb:      (err: Error, response: any) => void
   )
 
   subscribe(
-    cb: (message: AMessage, subID: string) => void
+    name: string,
+    cb:   (message: any) => void
   )
 
-  unsubscribe(subID: string)
-
-  subscriptions(): Subscription[]
-}
-
-//------------------------------------------------------------------------------
-interface Subscription {
-  ragent: RAgent
-  subID:  string
-}
-
-//------------------------------------------------------------------------------
-interface CloseStatus {
-  code:   number
-  reason: string
-}
-
-//------------------------------------------------------------------------------
-interface Message {
-  name: string
-  body: any
-}
-
-//------------------------------------------------------------------------------
-interface AMessage extends Message {
-  agent: RAgent
-}
-
-//------------------------------------------------------------------------------
-interface Reply {
-  reply(message: Message)
+  unsubscribe(name: string)
 }
 
 //------------------------------------------------------------------------------
