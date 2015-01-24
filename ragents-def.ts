@@ -32,6 +32,7 @@ interface Session extends events.EventEmitter {
 
 // events
 interface Session_event_close              { () }
+interface Session_event_error              { () }
 interface Session_event_ragentCreated      { (ragent: RAgent) }
 interface Session_event_ragentDestroyed    { (ragent: RAgent) }
 
@@ -48,7 +49,7 @@ interface Agent {
 
   destroy()
 
-  publish(
+  emit(
     name:    string,
     message: any
   )
@@ -68,7 +69,7 @@ interface Reply {
 }
 
 //------------------------------------------------------------------------------
-interface RAgent {
+interface RAgent extends events.EventEmitter {
   info: AgentInfo
 
   send(
@@ -77,12 +78,6 @@ interface RAgent {
     cb:      (err: Error, response: any) => void
   )
 
-  subscribe(
-    name: string,
-    cb:   (message: any) => void
-  )
-
-  unsubscribe(name: string)
 }
 
 //------------------------------------------------------------------------------
