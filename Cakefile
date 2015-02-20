@@ -1,23 +1,22 @@
 # Licensed under the Apache License. See footer for details.
 
-path = require "path"
+require "cakex"
 
-pkg = require("./package.json")
+pkg = require "./package.json"
 
 preReqFile = "../ragents-test/tmp/pre-reqs-updated.txt"
 
 #-------------------------------------------------------------------------------
-tasks = defineTasks exports,
-  watch: "watch for source file changes, build"
-  build: "run a build"
+task "watch", "watch for source file changes, build", -> taskWatch()
+task "build", "run a build",                          -> taskBuild()
 
-WatchSpec = "*.ts lib lib/**/* lib/channels lib/channels/**/* www www/**/*"
+WatchSpec = "*.ts lib/**/* lib/channels/**/* www/**/*"
 
 #-------------------------------------------------------------------------------
 mkdir "-p", "tmp"
 
 #-------------------------------------------------------------------------------
-tasks.build = ->
+taskBuild = ->
   syntaxCheckTypeScript "ragents-def.ts"
   syntaxCheckTypeScript "lib/channels/channel-def.ts"
 
@@ -28,16 +27,25 @@ tasks.build = ->
   "".to preReqFile
 
 #-------------------------------------------------------------------------------
-tasks.watch = ->
+taskWatch = ->
   watchIter()
 
   watch
     files: WatchSpec.split " "
     run:   watchIter
 
-  watchFiles "jbuild.coffee" :->
-    log "jbuild file changed; exiting"
-    process.exit 0
+  watch
+    files: "Cakefile"
+    run: (file) ->
+      return unless file == "Cakefile"
+      log "Cakefile changed, exiting"
+      exit 0
+
+#-------------------------------------------------------------------------------
+watchIter = ->
+  log "in #{path.relative "../..", __dirname}"
+
+  taskBuild()
 
 #-------------------------------------------------------------------------------
 syntaxCheckTypeScript = (file) ->
@@ -69,12 +77,6 @@ build_browser_version = ->
   cat_source_map "--fixFileNames tmp/#{oBase} www/#{oBase}"
 
   log "browser file(s) generated at: www/#{oBase}"
-
-#-------------------------------------------------------------------------------
-watchIter = ->
-  log "in #{path.relative "../..", __dirname}"
-
-  tasks.build()
 
 #-------------------------------------------------------------------------------
 cleanDir = (dir) ->
