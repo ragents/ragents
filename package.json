@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "browserify":       "8.1.x",
+    "debug":            "2.1.x",
     "cakex":            "0.1.x",
     "cat-source-map":   "0.1.x",
     "coffee-script":    "1.9.x",
