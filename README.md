@@ -1,27 +1,58 @@
 ragents - agent messaging protocol over WebSocket
 ================================================================================
 
-`ragents` is a messaging protocol used by *agents* to communicate with each
-other.  The messages run over WebSockets to a central *server* which acts as a
-switchboard.
+`ragents` is a messaging protocol run over WebSockets that allows multiple
+WebSocket clients to communicate with each other.  A generic `ragents` server
+is used to distribute the messages between the clients, so you can have two
+or more parties communicating without any of them having to run in a
+traditional "server" mode.  Which is nice for server-hostile environments,
+like web browsers, mobile devices etc.
 
-An *agent* connects to a *server* identifying a particular *session* they want
-to join.  All *agents* connected to a particular *session* can communicate with
-each other.
+A client connects to the `ragents` server to create a *session*, which is
+identified by the API key passed in at connection time.  Any clients that
+create a session with the same API key will be able to exchange messages.
 
-A *session* is identified with an API key, which is an arbitrary string that
-you probably want to make sure is unique and shared only between friends.
+Messages are exchanged via *agents*.  An *agent* can respond to *request*
+messages with a *response* message back to the sender, and can also emit
+*event* messages that any client can listen on.
 
-An *agent* is uniquely identified within a *session* by an *agentID*. An
-*agent* also specifies a particular *protocol* that it speaks, and optionally
-an arbitrary (but short-ish) *name*.
 
-There are three types of messages that can be sent between *agents*.  An
-*agent* can sent a *request* message to a specific *agent*, which will in turn
-send a *response* message back to the originating *agent*.  An *agent* can also
-send an *event* message, which will be forwarded to all *agents* that are
-*listening* for *event* messages.
 
+sample
+================================================================================
+
+```js
+var options = { url: "ws://localhost:9000", key: new Date() }
+
+ragents.createSession(options, sessionCreated)
+
+function sessionCreated(err, session) {
+  var agentInfo = {name: "echoer", title: "an echo agent" }
+
+  session.createAgent(agentInfo, function(err, agent) {
+    agentCreated(session, err, agent)
+  })
+}
+
+function agentCreated(session, err, agent) {
+  agent.receive("echo", function(body, reply) {
+    reply(null, body)
+    agent.emit("echoed", body)
+  })
+
+  session.getRemoteAgents(gotRemoteAgents)
+}
+
+function gotRemoteAgents(err, ragents) {
+  var ragent = ragents[0]
+  ragent.on("echoed", function(body) {
+    console.log("agent echoed:", body)
+  })
+  ragent.send("echo", {a:1}, function(err, body){
+    console.log("agent sent:  ", body)
+  })
+}
+```
 
 
 using ragents
@@ -31,40 +62,37 @@ You can program either to the
 [WebSocket message protocol](ragents-ws-protocol.md)
 or to the
 [JavaScript API](ragents-js-api.md).
-The server is also available as an API, described in the *JavaScript API*
-document.
 
 For node.js, the JavaScript API is available via the `ragents` package on npm:
 <https://www.npmjs.com/package/ragents>
 
-For the browser, you can either use
+For the browser, you can either use a node module packager like
 [browserify](https://www.npmjs.com/package/browserify)
-with the npm package, or you can use the standalone file `ragents-browser.js`
-which adds an `ragents` global, and otherwise is the same as the npm package.
+with the `ragents` package, or you can use the standalone file
+`www/ragents-browser.js` which adds an `ragents` global, and otherwise is
+the same as the npm package.
 
-A stand-alone server is available as the npm-installed command `ragentsd`,
-or you can use it programmatically via the *JavaScript API*.  The stand-alone
-server takes no arguments, but will use the `PORT` environment variable, if set,
-as the port to bind the server to; otherwise an port will be chosen and
-displayed when the server starts.
+The `ragents-server` package provides generic server code for a ragents server,
+as well as a standalone executable, `ragentsd`.  See the `ragents-server` package
+on npm:
+<https://www.npmjs.com/package/ragents-server>
 
 
 
 hacking
 ================================================================================
 
-This project uses [jbuild](https://www.npmjs.com/package/jbuild) as it's
+This project uses [cake](http://coffeescript.org/#cake) as it's
 build tool.  To rebuild the project continuously, use the command
 
     npm run watch
 
-Other `jbuild` commands are available (assuming you are using npm v2) with
+Other `cake` commands are available (assuming you are using npm v2) with
 the command
 
-    npm run jbuild -- <command here>
+    npm run cake -- <command here>
 
-Run `npm run jbuild` to see the other commands available in the `jbuild.coffee`
-file.
+Run `npm run cake` to see the other commands available in the `Cakefile`.
 
 
 

@@ -3,7 +3,7 @@
   "version":            "0.1.0",
   "description":        "agent messaging protocol over WebSocket",
   "author":             "pmuellr",
-  "main":               "lib/ragents",
+  "main":               "./lib/ragents",
   "scripts": {
     "cake":             "cake",
     "watch":            "cake watch"
