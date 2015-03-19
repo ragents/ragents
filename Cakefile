@@ -17,13 +17,15 @@ mkdir "-p", "tmp"
 
 #-------------------------------------------------------------------------------
 taskBuild = ->
+  copyBowerFiles "doc/bower"
+
   syntaxCheckTypeScript "ragents-def.ts"
   syntaxCheckTypeScript "lib/channels/channel-def.ts"
 
   log "linting ..."
   jshint "lib/*.js lib/channels/*.js"
 
-  build_browser_version()
+  buildBrowserVersion()
   "".to preReqFile
 
 #-------------------------------------------------------------------------------
@@ -33,6 +35,10 @@ taskWatch = ->
   watch
     files: WatchSpec.split " "
     run:   watchIter
+
+  # watch
+  #   files: "doc/**/*"
+  #   run:   watchIterDoc
 
   watch
     files: "Cakefile"
@@ -48,12 +54,18 @@ watchIter = ->
   taskBuild()
 
 #-------------------------------------------------------------------------------
+watchIterDoc = ->
+  log "in #{path.relative "../..", __dirname}"
+
+  createGraphvizSVG "doc/graphviz"
+
+#-------------------------------------------------------------------------------
 syntaxCheckTypeScript = (file) ->
   log "syntax checking: #{file} ..."
   tsc "--outDir tmp --module commonjs #{file}"
 
 #-------------------------------------------------------------------------------
-build_browser_version = ->
+buildBrowserVersion = ->
   oBase  = "ragents-browser.js"
 
   mkdir "-p", "www"
@@ -77,6 +89,53 @@ build_browser_version = ->
   cat_source_map "--fixFileNames tmp/#{oBase} www/#{oBase}"
 
   log "browser file(s) generated at: www/#{oBase}"
+
+#-------------------------------------------------------------------------------
+createGraphvizSVG = (iDir) ->
+  log "generating SVG from GraphViz ..."
+
+  oDir = path.join iDir, "..", "svg"
+
+  for file in ls iDir
+    continue unless file.match /\.dot$/
+
+    iFile = path.join iDir, file
+    oFile = path.join oDir, file
+
+    oFile += ".svg"
+
+    cmd = "dot -Tsvg -o #{oFile} #{iFile}"
+    log "  #{cmd}"
+
+    exec cmd
+
+  return
+
+#-------------------------------------------------------------------------------
+copyBowerFiles = (dir) ->
+  bowerConfig = require "./bower-config"
+
+  log "installing files from bower"
+
+  cleanDir dir
+
+  for name, {version, files} of bowerConfig
+    unless test "-d", "bower_components/#{name}"
+      bower "install #{name}##{version}"
+      log ""
+
+  for name, {version, files} of bowerConfig
+    for src, dst of files
+      src = "bower_components/#{name}/#{src}"
+
+      if dst is "."
+        dst = "#{dir}/#{name}"
+      else
+        dst = "#{dir}/#{name}/#{dst}"
+
+      mkdir "-p", dst
+
+      cp "-R", src, dst
 
 #-------------------------------------------------------------------------------
 cleanDir = (dir) ->
