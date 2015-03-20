@@ -4,7 +4,7 @@
 
 var ragents = require("./lib/ragents")
 
-var options = { url: "ws://localhost:9000", key: new Date() }
+var options = { url: "ws://localhost:9000", key: "sample" }
 
 ragents.createSession(options, sessionCreated)
 
@@ -17,21 +17,12 @@ function sessionCreated(err, session) {
 }
 
 function agentCreated(session, err, agent) {
+  console.log("agent", agent.info.id, "created, waiting for echo requests")
+
   agent.receive("echo", function(body, reply) {
+    console.log("agent responded to echo request")
     reply(null, body)
     agent.emit("echoed", body)
-  })
-
-  session.getRemoteAgents(gotRemoteAgents)
-}
-
-function gotRemoteAgents(err, ragents) {
-  var ragent = ragents[0]
-  ragent.on("echoed", function(body) {
-    console.log("agent echoed:", body)
-  })
-  ragent.send("echo", {a:1}, function(err, body){
-    console.log("agent sent:  ", body)
   })
 }
 

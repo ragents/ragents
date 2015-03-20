@@ -18,11 +18,16 @@ messages with a *response* message back to the sender, and can also emit
 
 
 
-sample
+
+sample 1 - acting as server
 ================================================================================
 
+Run the ragents server on port 9000 (eg, `ragentsd -p 9000`), and then
+run the sample 1 code and sample 2 code in whatever order you like, as many
+times as you like.
+
 ```js
-var options = { url: "ws://localhost:9000", key: new Date() }
+var options = { url: "ws://localhost:9000", key: "sample" }
 
 ragents.createSession(options, sessionCreated)
 
@@ -35,21 +40,46 @@ function sessionCreated(err, session) {
 }
 
 function agentCreated(session, err, agent) {
+  console.log("agent", agent.info.id, "created, waiting for echo requests")
+
   agent.receive("echo", function(body, reply) {
+    console.log("agent responded to echo request")
     reply(null, body)
     agent.emit("echoed", body)
   })
+}
+```
+
+
+sample 2 - acting as client
+================================================================================
+
+```js
+var options = { url: "ws://localhost:9000", key: "sample" }
+
+ragents.createSession(options, sessionCreated)
+console.log("waiting for echoer's to appear in the session")
+
+function sessionCreated(err, session) {
+  session.on("ragentCreated", performEcho)
 
   session.getRemoteAgents(gotRemoteAgents)
 }
 
 function gotRemoteAgents(err, ragents) {
-  var ragent = ragents[0]
+  ragents.forEach(performEcho)
+}
+
+function performEcho(ragent) {
+  console.log("performEcho()")
+  if (ragent.info.name != "echoer") return
+
   ragent.on("echoed", function(body) {
-    console.log("agent echoed:", body)
+    console.log("agent", ragent.info.id, "echoed:", body)
   })
+
   ragent.send("echo", {a:1}, function(err, body){
-    console.log("agent sent:  ", body)
+    console.log("agent", ragent.info.id, "sent:  ", body)
   })
 }
 ```
