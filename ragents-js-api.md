@@ -1,57 +1,43 @@
 ragents JavaScript API
 ================================================================================
 
-OUT OF DATE
-
-OUT OF DATE
-
-OUT OF DATE
-
-OUT OF DATE
-
-OUT OF DATE
-
-
 Description of a JavaScript API over the ragents protocol.
 
 When using the stand-alone JavaScript file for the browser, a global `ragents`
 is installed, with the same value as the `ragents` module exports.
 
+Unless otherwise noted, none of the functions or methods documented here
+return a value.
+
+Objects passed with requests, responses, and events will be serialized
+and deserialized with `JSON.stringify()` and `JSON.parse()`.
 
 
 module `ragents`
 ================================================================================
 
-The `ragents` module exports the following functions:
+The `ragents` module exports the following function:
 
-* `createLocalSession(cb)`
-* `createWebSocketSession(wsURL, key, cb)`
+* `createSession(config, cb)`
 
 
-function `createLocalSession(cb)`
+function `createSession(config, cb)`
 --------------------------------------------------------------------------------
 
-Creates a new local `Session` object, passed via the callback.  Returns nothing.
+Creates a new local `Session` object, passed via the callback.
+
+You can create multiple session objects, pointing to the same or different
+servers, with the same or different keys.  All clients that connect to the
+same server with the same key are connected to the same session.
+
+The `config` parameter should be an object with two properties:
+
+* `url` - the URL to the ragents server
+* `key` - the API key indicating the session to join
 
 The `cb` parameter is a function of the form `cb(err, session)`, where:
 
-* `err`   - on error, the error object
-* `session` - on success, a `Session` object
-
-
-function `createWebSocketSession(wsURL, key, cb)`
---------------------------------------------------------------------------------
-
-Creates a new remote `Session` object, passed via the callback.  Returns nothing.
-
-The `wsURL` parameter is a URL to a WebSocket server.
-
-The `key` parameter is a unique key that identifies this session amongst others
-on the server.  Presumably secret.
-
-The `cb` parameter is a function of the form `cb(err, session)`, where:
-
-* `err`   - on error, the error object
+* `err`     - on error, the error object
 * `session` - on success, a `Session` object
 
 
@@ -59,194 +45,200 @@ The `cb` parameter is a function of the form `cb(err, session)`, where:
 `Session` objects
 ================================================================================
 
-A `Session` object is an event emitter with the following methods:
+A `Session` object is the connection between your local program, and
+all the other clients connected to the same server with the same API key.
+
+You can create and destroy agents with the `createAgent()` and `destroyAgent()`
+methods, and listen for remote agents being created and destroyed with the
+`ragentCreated` and `ragentDestroyed` events.  You can also get a list of the
+current agents in the session with the `getRemoteAgents()` method.
+
+These objects are event emitters that have the following methods:
 
 * `close()`
-* `connectAgent(info, fn(err, agent))`
+* `createAgent(agentInfo, cb)`
+* `destroyAgent(agentInfo, cb)`
+* `getRemoteAgents(cb)`
 
-A `Session` object will emit the following events:
+These objects will emit the following events:
 
-* `close` - when the WebSocket is closed or the session is otherwise closed
+* `close{}`
+* `error{err}`
+* `ragentCreated{ragent}`
+* `ragentDestroyed{ragent}`
 
 
 method `close()`
 --------------------------------------------------------------------------------
 
+Closes the session, and destroys all local agents created in this session.
 
-method `connectAgent(info, fn(err, agent))`
+
+method `createAgent(agentInfo, cb)`
 --------------------------------------------------------------------------------
 
+Creates a new local agent.
+
+The `agentInfo` parameter should be in the shape of an `AgentInfo` object.
+
+The `cb` parameter is a function of the form `cb(err, agent)`, where:
+
+* `err`   - on error, the error object
+* `agent` - on success, an `Agent` object
+
+
+method `destroyAgent(agentInfo, cb)`
+--------------------------------------------------------------------------------
+
+Destroys a local agent.
+
+The `agentInfo` parameter should be in the shape of an `AgentInfo` object.
+
+The `cb` parameter is a function of the form `cb(err, session)`, where:
+
+* `err`     - on error, the error object
+* `session` - on success, a `Session` object
+
+
+method `getRemoteAgents(cb)`
+--------------------------------------------------------------------------------
+
+Returns all agents available in this session.
+
+The `cb` parameter is a function of the form `cb(err, ragents)`, where:
+
+* `err`     - on error, the error object
+* `ragents` - on success, an array of `RAgent` objects
+
+
+event `close{}`
+--------------------------------------------------------------------------------
+
+This event is emitted when the session is closed.
+
+
+event `error{err}`
+--------------------------------------------------------------------------------
+
+This event is emitted when an error occurs on the transport.  An `Error`
+object will be passed with the event.
+
+
+event `ragentCreated{ragent}`
+--------------------------------------------------------------------------------
+
+This event is emitted when a new agent is created in the session.  A `RAgent`
+object will be passed with the event.
+
+
+event `ragentDestroyed{ragent}`
+--------------------------------------------------------------------------------
+
+This event is emitted when an agent is destroyed in the session.  A `RAgent`
+object will be passed with the event.
+
+
+
+`AgentInfo` objects
+================================================================================
+
+An `AgentInfo` object provides descriptive information about an agent.
+
+An `AgentInfo` object has the following properties:
+
+* `id` - unique id of the agent within the session
+* `name` - a short, unique name of the agent
+* `title` - a descriptive name of the agent
+
+Note that when an `AgentInfo` object is passed into `session.createAgent()`,
+the `id` property will be ignored, as it will be reset to it's unique value
+in that function's callback.
 
 
 `Agent` objects
 ================================================================================
 
-An `Agent` object is an event emitter with the following methods:
+An `Agent` object is the local version of an *agent*, which can receive
+requests and send responses, and broadcast events.
 
-* `sendEvent(eventMessage)`
+These objects have the following property:
 
-A `Agent` object will emit the following events:
+* `info` - an `AgentInfo` object
 
-* `close`
-* `error`
-* `request`
-* `ragentConnected`
-* `ragentDisconnected`
+These objects have the following methods:
+
+* `destroy()`
+* `emit(name, object)`
+* `receive(name, cb)`
 
 
-method `sendRequest(address, memo)`
+method `destroy()`
 --------------------------------------------------------------------------------
 
-Posts a memo to specified address.
-
-The `address` parameter is a string indicating an address to send the memo to.
-
-The `memo` is a JSON-able object representing the memo.
+Destroys the agent.
 
 
-event `close`
+method `emit(name, object)`
 --------------------------------------------------------------------------------
 
+Broadcast an event.  
 
-event `error`
+Associated `RAgent` objects will receive these events
+via their built-in event emitter, and so can listen for the events with
+`on()`, `addListener()`, etc.
+
+The `name` parameter is the name of the event.
+
+The `object` parameter is the object to send with the event.
+
+
+method `receive(name, cb)`
 --------------------------------------------------------------------------------
 
+Set up a callback to be invoked when the agent is sent a request.
 
-event `request`
---------------------------------------------------------------------------------
+The `name` parameter is the name of the request.
 
-This event is emitted when a request message is sent to this agent.
+The `cb` parameter is a function of the form `cb(object, reply)`, where:
 
-The event listener is a function of the form `cb(request, sendResponse)`, where:
+* `object` - is the object passed with the request
+* `reply`  - is a function that should be called to send the response
 
+The `reply` parameter is a function of the form `reply(err, object)`, where:
 
-* `body` - the JSON-able body of the event sent from the target
-
-
-event `targetConnected`
---------------------------------------------------------------------------------
-
-This event is emitted when an target connects.
-
-The event listener is a function of the form `cb(targetID)`, where:
-
-* `targetID` - the id of the connected target
-
-
-event `targetDisconnected`
---------------------------------------------------------------------------------
-
-This event is emitted when an target disconnects.
-
-The event listener is a function of the form `cb(targetID)`, where:
-
-* `targetID` - the id of the disconnected target
+* `err`    - is an Error object sent with the response on failure
+* `object` - is the object passed with the response on success
 
 
 
-`Target` objects
+`RAgent` objects
 ================================================================================
 
-A `Target` object is an event emitter with the following method:
+An `RAgent` object is the remote version of an *agent*, which can be sent
+requests and receive responses, and emit events.
 
-* `sendEvent(body)`
+These objects have the following property:
 
-A `Client` object will emit the following events:
+* `info` - an `AgentInfo` object
 
-* `close`
-* `error`
-* `appRequest`
-* `clientsAttached`
-* `clientsDetached`
+These objects are event emitters that have the following method:
+
+* `send()`
+
+These objects will emit events which are broadcast from a corresponding
+`Agent` object.
 
 
-method `sendEvent(body)`
+method `send(name, object, cb)`
 --------------------------------------------------------------------------------
 
-Send an appEvent to attached clients.
+Send a request to an agent.
 
-The `body` parameter is a JSON-able JavaScript object which serves as the
-body of the event.
+The `name` parameter is the name of the request.
 
+The `object` parameter is the object passed with the request.
 
-event `close`
---------------------------------------------------------------------------------
+The `cb` parameter is a function of the form `cb(err, object)`, where:
 
-This event is emitted when the WebSocket is closed.  
-
-The event listener is a function of the form `cb(reason)`, where:
-
-* `reason` - the reason the WebSocket was closed
-
-
-event `error`
---------------------------------------------------------------------------------
-
-This event is emitted when the WebSocket has an error.  
-
-The event listener is a function of the form `cb(err)`, where:
-
-* `err` - the error object
-
-
-event `appRequest`
---------------------------------------------------------------------------------
-
-This event is emitted when a client sends a request.
-
-The event listener is a function of the form `cb(request)`, where:
-
-* `request` - a `Request` object
-
-
-event `clientsAttached`
---------------------------------------------------------------------------------
-
-This event is emitted when the first client attaches to the target.
-
-The event listener is a function of the form `cb()`
-
-
-event `clientsDetached`
---------------------------------------------------------------------------------
-
-This event is emitted when the last client deattaches from the target.
-
-The event listener is a function of the form `cb()`
-
-
-
-`Request` objects
-================================================================================
-
-A `Request` object has the following property:
-
-* `body`
-
-A `Request` object has the following methods:
-
-* `sendResponse(body)`
-* `sendError(error)`
-
-
-property `body`
---------------------------------------------------------------------------------
-
-Contains the JSON-able body of the request sent from a client.
-
-
-method `sendResponse(body)`
---------------------------------------------------------------------------------
-
-Send a successful response to the client.
-
-The `body` parameter is a JSON-able JavaScript object which serves as the
-body of the response.
-
-
-method `sendError(error)`
---------------------------------------------------------------------------------
-
-Send an error response to the client.
-
-The `error` parameter is an Error object or String describing the error.
+* `err`    - on error, the error object
+* `object` - on success, the object passed in the response

@@ -1,6 +1,16 @@
 ragents protocol
 ================================================================================
 
+OUT OF DATE
+
+OUT OF DATE
+
+OUT OF DATE
+
+OUT OF DATE
+
+OUT OF DATE
+
 Description of the message packets flowing over the WebSockets used by ragents.
 
 The ragents protocol allows peer-to-peer communication between programming
