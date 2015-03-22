@@ -4,27 +4,56 @@
 
 var ragents = require("../../lib/ragents")
 
+var Agent = null
+
+// server and key
 var options = { url: "ws://localhost:9000", key: "sample" }
 
+console.log("creating session")
 ragents.createSession(options, sessionCreated)
 
+//---------------------------------------------------------
+// session was created (or error)
 function sessionCreated(err, session) {
+  if (err) throw err
+
+  console.log("session created, creating agent")
+
   var agentInfo = {name: "echoer", title: "an echo agent" }
 
+  // create the agent, calling `agentCreated` when done
   session.createAgent(agentInfo, function(err, agent) {
     agentCreated(session, err, agent)
   })
 }
 
+//---------------------------------------------------------
+// agent was created (or error)
 function agentCreated(session, err, agent) {
-  console.log("agent", agent.info.id, "created, waiting for echo requests")
+  if (err) throw err
 
-  agent.receive("echo", function(body, reply) {
-    console.log("agent responded to echo request")
-    reply(null, body)
-    agent.emit("echoed", body)
-  })
+  // save our agent as a global (for `emit()` below)
+  Agent = agent
+
+  console.log("agent created: " + JS(agent.info))
+
+  console.log("waiting for echo requests")
+  agent.receive("echo", echoRequest)
 }
+
+//---------------------------------------------------------
+// handle an echo request
+function echoRequest(body, reply) {
+  console.log("agent receive: echo,   " + JS(body))
+  console.log("agent reply:   echo,   " + JS(body))
+  reply(null, body)
+
+  console.log("agent emit:    echoed, " + JS(body))
+  Agent.emit("echoed", body)
+}
+
+//---------------------------------------------------------
+function JS(obj) { return JSON.stringify(obj) }
 
 //------------------------------------------------------------------------------
 // Licensed under the Apache License, Version 2.0 (the "License");

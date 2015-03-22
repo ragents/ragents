@@ -110,6 +110,15 @@ The `cb` parameter is a function of the form `cb(err, ragents)`, where:
 * `err`     - on error, the error object
 * `ragents` - on success, an array of `RAgent` objects
 
+The typical way to see what agents are available when a client connects to
+a session, and get all the agents created after that, would be to add a
+listener to the event `ragentCreated{ragent}`, and then call this method.  Due
+to timing, the same objects may appear in both.  You shouldn't miss any,
+however, if you listen to the event, before calling this method.
+
+The alternative would be to poll for the agents by calling this method every
+few seconds.
+
 
 event `close{}`
 --------------------------------------------------------------------------------
@@ -152,7 +161,7 @@ An `AgentInfo` object has the following properties:
 
 Note that when an `AgentInfo` object is passed into `session.createAgent()`,
 the `id` property will be ignored, as it will be reset to it's unique value
-in that function's callback.
+when the agent is actually created, and returned in that function's callback.
 
 
 `Agent` objects
@@ -206,9 +215,11 @@ The `cb` parameter is a function of the form `cb(object, reply)`, where:
 
 The `reply` parameter is a function of the form `reply(err, object)`, where:
 
-* `err`    - is an Error object sent with the response on failure
-* `object` - is the object passed with the response on success
+* `err`    - on error, the Error object
+* `object` - on success or error, the object passed in the response
 
+Note that only the `message` property of the Error will be sent back to the
+requester.
 
 
 `RAgent` objects
@@ -240,5 +251,5 @@ The `object` parameter is the object passed with the request.
 
 The `cb` parameter is a function of the form `cb(err, object)`, where:
 
-* `err`    - on error, the error object
-* `object` - on success, the object passed in the response
+* `err`    - on error, the Error object
+* `object` - on success or error, the object passed in the response
