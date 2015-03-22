@@ -1,8 +1,8 @@
 // Licensed under the Apache License. See footer for details.
 
-// node ../ragents-server/lib/ragentsd -p 9000
+// node ../../../ragents-server/lib/ragentsd -p 9000
 
-var ragents = require("./lib/ragents")
+var ragents = require("../../lib/ragents")
 
 var options = { url: "ws://localhost:9000", key: "sample" }
 

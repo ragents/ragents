@@ -1,0 +1,71 @@
+# Licensed under the Apache License. See footer for details.
+
+require "cakex"
+
+#-------------------------------------------------------------------------------
+task "watch", "watch for source file changes, build", -> taskWatch()
+task "build", "run a build",                          -> taskBuild()
+
+dirs = _.filter ls(), ((file) -> test "-d", file)
+
+browserify = "../../node_modules/.bin/browserify"
+
+#-------------------------------------------------------------------------------
+taskBuild = ->
+  build ["echo"]
+  build ["stress-events"]
+  build ["stress-rpc"]
+
+#-------------------------------------------------------------------------------
+build = (buildDirs) ->
+  buildDirs ?= dirs
+
+  for bDir in buildDirs
+    switch bDir
+      when "stress-rpc"
+        log "browserifying..."
+
+        cd "stress-rpc"
+        exec "#{browserify} --outfile ping-browser.js --entry ping.js --standalone ping --ignore v8"
+        exec "#{browserify} --outfile pong-browser.js --entry pong.js --standalone pong --ignore v8"
+        cd ".."
+
+#-------------------------------------------------------------------------------
+taskWatch = ->
+  watchIter()
+
+  for dir in dirs
+    watch
+      files: "#{dir}/**/*"
+      run:   -> build [dir]
+
+  watch
+    files: "Cakefile"
+    run: (file) ->
+      return unless file == "Cakefile"
+      log "Cakefile changed, exiting"
+      exit 0
+
+#-------------------------------------------------------------------------------
+watchIter = ->
+  taskBuild()
+
+
+#-------------------------------------------------------------------------------
+cleanDir = (dir) ->
+  mkdir "-p", dir
+  rm "-rf", "#{dir}/*"
+
+#-------------------------------------------------------------------------------
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#-------------------------------------------------------------------------------
