@@ -18,67 +18,109 @@ messages with a *response* message back to the sender, and can also emit
 
 
 
-
-sample 1 - acting as server
+sample
 ================================================================================
 
-Run the ragents server on port 9000 (eg, `ragentsd -p 9000`), and then
-run the sample 1 code and sample 2 code in whatever order you like, as many
-times as you like.
+
+Install the [ragents server](https://www.npmjs.com/package/ragents-server),
+and then run it on port 9000; eg, `ragentsd -p 9000`
+
+Then run the two scripts below, in any order you like, as many times as you like.
+
+
+sample "server"
+--------------------------------------------------------------------------------
 
 ```js
+var ragents = require("ragents")
+
+// server URL and session key
 var options = { url: "ws://localhost:9000", key: "sample" }
 
+// connect to a session
 ragents.createSession(options, sessionCreated)
 
+// connected to session
 function sessionCreated(err, session) {
+  if (err) throw err
+
+  // agent information
   var agentInfo = {name: "echoer", title: "an echo agent" }
 
+  // create an agent
   session.createAgent(agentInfo, function(err, agent) {
     agentCreated(session, err, agent)
   })
 }
 
+// agent was created
 function agentCreated(session, err, agent) {
+  if (err) throw err
   console.log("agent", agent.info.id, "created, waiting for echo requests")
 
+  // agent will handle "echo" requests
   agent.receive("echo", function(body, reply) {
-    console.log("agent responded to echo request")
+    // send message body back to sender
     reply(null, body)
+
+    // emit an "echoed" event, with the message body
     agent.emit("echoed", body)
+
+    console.log("agent responded to echo request")
   })
 }
 ```
 
 
-sample 2 - acting as client
-================================================================================
+sample client
+--------------------------------------------------------------------------------
 
 ```js
+var ragents = require("ragents")
+
+// server URL and session key
 var options = { url: "ws://localhost:9000", key: "sample" }
 
+// connect to a session
 ragents.createSession(options, sessionCreated)
-console.log("waiting for echoer's to appear in the session")
 
+// connected to a session
 function sessionCreated(err, session) {
-  session.on("ragentCreated", performEcho)
+  if (err) throw err
 
+  // watch for new agents being created
+  session.on("ragentCreated", agentAdded)
+
+  // get all the available agents
   session.getRemoteAgents(gotRemoteAgents)
+
+  console.log("waiting for agents")
 }
 
+// got the available remote agents
 function gotRemoteAgents(err, ragents) {
-  ragents.forEach(performEcho)
+  if (err) throw err
+  ragents.forEach(agentAdded)
 }
 
-function performEcho(ragent) {
-  console.log("performEcho()")
+// for every agent we see ...
+function agentAdded(ragent) {
+  console.log("agentAdded()")
+
+  // only interested in "echoer" agents
   if (ragent.info.name != "echoer") return
 
+  // when an "echoer" agent emits an "echoed" event ...
   ragent.on("echoed", function(body) {
     console.log("agent", ragent.info.id, "echoed:", body)
   })
 
-  ragent.send("echo", {a:1}, function(err, body){
+  // send an "echo" request to the agent
+  var body = {a: 1}
+  console.log("agent", ragent.info.id, "send:  ", body)
+
+  ragent.send("echo", body, function(err, body){
+    // response received from agent
     console.log("agent", ragent.info.id, "sent:  ", body)
   })
 }
@@ -89,9 +131,9 @@ using ragents
 ================================================================================
 
 You can program either to the
-[WebSocket message protocol](ragents-ws-protocol.md)
+[WebSocket message protocol](https://github.com/ragents/ragents/blob/master/ragents-ws-protocol.md)
 or to the
-[JavaScript API](ragents-js-api.md).
+[JavaScript API](https://github.com/ragents/ragents/blob/master/ragents-js-api.md).
 
 For node.js, the JavaScript API is available via the `ragents` package on npm:
 <https://www.npmjs.com/package/ragents>

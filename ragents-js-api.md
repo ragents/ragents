@@ -236,6 +236,10 @@ These objects are event emitters that have the following method:
 
 * `send()`
 
+Because they are event emitters, they also have all of the
+[`events.EventEmitter`](https://iojs.org/api/events.html#events_class_events_eventemitter)
+methods like `on()` and `addListener()`.
+
 These objects will emit events which are broadcast from a corresponding
 `Agent` object.
 
